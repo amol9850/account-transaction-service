@@ -50,7 +50,7 @@ A Spring Boot REST API for managing customer accounts and their transactions usi
 
 The application uses H2 in-memory database. You can access the H2 console at:
 - URL: http://localhost:8080/h2-console
-- JDBC URL: `jdbc:h2:mem:accountdb`
+- JDBC URL: `jdbc:h2:mem:testdb`
 - Username: `sa`
 - Password: `password`
 - Swagger UI :http://localhost:8080/swagger-ui/index.html
