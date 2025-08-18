@@ -65,7 +65,7 @@ POST /accounts
 Content-Type: application/json
 
 {
-    "document_number": "12345678900"
+    "document_number":"12345678797"
 }
 ```
 

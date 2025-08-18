@@ -21,6 +21,7 @@ public class Account {
     @Column(name = "account_id")
     private Long accountId;
 
+
     @Column(name = "document_number", nullable = false, unique = true, length = 11)
     private String documentNumber;
 

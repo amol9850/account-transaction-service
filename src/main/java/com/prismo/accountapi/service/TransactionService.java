@@ -14,6 +14,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -39,6 +41,7 @@ public class TransactionService {
         TransactionResponseDTO transactionResponseDTO=null;
         Transaction savedTransaction=null;
        try {
+            BigDecimal balance=BigDecimal.ZERO;
             // Find the account and operation type
             Account account = accountService.findAccountById(transactionRequestDTO.getAccount_id());
             OperationType operationType = operationTypeService.findOperationTypeById(transactionRequestDTO.getOperation_type_id());
@@ -47,8 +50,23 @@ public class TransactionService {
             BigDecimal amount = applyAmountBusinessRules(transactionRequestDTO.getAmount(), operationType);
             logger.info("Applying business rules for operation type: {}", operationType.getDescription());
 
+            //add new logic
+           if(operationType.getDescription().equals("Payment")){
+
+               List<Transaction> transactionList = transactionRepository.findAll().stream().filter(transaction -> transaction.getBalance().compareTo(BigDecimal.ZERO) > 0)
+                       .collect(Collectors.toList());
+
+               for(int i=0;i<transactionList.size();i++){
+                   if(amount!=BigDecimal.ZERO) {
+                       balance = amount.subtract(transactionList.get(i).getBalance());
+                       transactionList.get(i).setBalance(balance);
+                   }
+
+               }
+           }
+
             // Create and save transaction
-            Transaction transaction = new Transaction(account, operationType, amount);
+            Transaction transaction = new Transaction(account, operationType, amount,balance);
              savedTransaction = transactionRepository.save(transaction);
 
             // Create response DTO

@@ -27,6 +27,9 @@ public class Transaction {
     @JsonBackReference
     private Account account;
 
+    @Column(name = "balance")
+    private BigDecimal balance;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "operation_type_id", nullable = false)
     @JsonBackReference
@@ -47,10 +50,11 @@ public class Transaction {
     }
 
 
-    public Transaction(Account account, OperationType operationType, BigDecimal amount) {
+    public Transaction(Account account, OperationType operationType, BigDecimal amount, BigDecimal balance) {
         this.account = account;
         this.operationType = operationType;
         this.amount = amount;
+        this.balance=balance;
     }
 
 }
