@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -41,7 +42,6 @@ public class TransactionService {
         TransactionResponseDTO transactionResponseDTO=null;
         Transaction savedTransaction=null;
        try {
-            BigDecimal balance=BigDecimal.ZERO;
             // Find the account and operation type
             Account account = accountService.findAccountById(transactionRequestDTO.getAccount_id());
             OperationType operationType = operationTypeService.findOperationTypeById(transactionRequestDTO.getOperation_type_id());
@@ -51,25 +51,39 @@ public class TransactionService {
             logger.info("Applying business rules for operation type: {}", operationType.getDescription());
 
             //add new logic
-           if(operationType.getDescription().equals("Payment")){
+           BigDecimal paymentLeft = amount; // as we need to presist original amount also taking amt in other variable to do subtract operation
+           BigDecimal balance = amount;
 
-               List<Transaction> transactionList = transactionRepository.findAll().stream().filter(transaction -> transaction.getBalance().compareTo(BigDecimal.ZERO) > 0)
-                       .collect(Collectors.toList());
+           if ("PAYMENT".equalsIgnoreCase(operationType.getDescription())) {
+               // Find negative-balance transactions for this account, ordered oldest first
+               List<Transaction> negativeTxns =
+                       transactionRepository.findAll().stream()
+                               .filter(transaction -> transaction.getAccount().getAccountId().equals(account.getAccountId()))//if tble has othr acc transation
+                               .filter(transaction -> transaction.getBalance().compareTo(BigDecimal.ZERO) < 0)
+                               .sorted(Comparator.comparing(Transaction::getEventDate))//adding sorting as have to settle oldest firrst and then new
+                               .collect(Collectors.toList());
 
-               for(int i=0;i<transactionList.size();i++){
-                   if(amount!=BigDecimal.ZERO) {
-                       balance = amount.subtract(transactionList.get(i).getBalance());
-                       transactionList.get(i).setBalance(balance);
+               for (Transaction t : negativeTxns) {
+                   if (paymentLeft.compareTo(BigDecimal.ZERO) <= 0) {
+                       break;
                    }
+                   BigDecimal txnAbs = t.getBalance().abs();//getting abs val to avboid confusion of negative values
+                   BigDecimal pay = paymentLeft.min(txnAbs);// compare with "PAYMENT" amt to decide we can settle full or partial for a transaction.
 
+                   // Discharge as much as possible
+                   t.setBalance(t.getBalance().add(pay)); // balance is negative, add pay (pay always positive)
+                   transactionRepository.save(t);
+                   paymentLeft = paymentLeft.subtract(pay);
                }
+               // The balance of the payment txn is any leftover (should be zero if payment exactly discharges, positive if more pay, cannot be negative)
+               balance = paymentLeft.max(BigDecimal.ZERO);
            }
 
-            // Create and save transaction
-            Transaction transaction = new Transaction(account, operationType, amount,balance);
-             savedTransaction = transactionRepository.save(transaction);
+           Transaction transaction = new Transaction(account, operationType, amount, balance);
+           savedTransaction = transactionRepository.save(transaction);
 
-            // Create response DTO
+
+           // Create response DTO
              transactionResponseDTO = new TransactionResponseDTO(
                 savedTransaction.getTransactionId(),
                 savedTransaction.getAccount().getAccountId(),
